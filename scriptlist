@@ -1,0 +1,21 @@
+#!/usr/bin/python3
+
+from os import listdir, getenv, system, popen
+from os.path import isfile, join
+import sys
+
+def main():
+    home  = getenv("HOME")
+    path  = join(home, ".rofi")
+
+    if len(sys.argv) > 1:
+        scriptpath = join(path, sys.argv[1])
+        popen("rofi -show {0} -modi {0}:{1}".format(sys.argv[1], scriptpath))
+        return
+
+    onlyfiles = [f for f in listdir(path) if isfile(join(path, f)) and f != "scriptlist"]
+    print('\0prompt\x1fSelect script\n')
+    print('\n'.join(onlyfiles))
+
+if __name__ == "__main__":
+    main()

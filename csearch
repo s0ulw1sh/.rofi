@@ -1,0 +1,72 @@
+#!/usr/bin/python3
+
+from os import getenv, popen
+from os.path import join
+import sys, os
+import subprocess
+
+def dataset(state, d):
+    print("\0data\x1f{}_x_x_{}\n".format(state, d))
+
+def dataget():
+    data  = getenv('ROFI_DATA', '')
+    if data == '':
+        return '', ''
+    s = data.split('_x_x_')
+    if len(s) != 2:
+        return '', ''
+    return s[0], s[1]
+
+def main():
+
+    path = getenv('PATH_CSEARCH')
+
+    if path is None:
+        home = getenv('HOME')
+        path = join(home, '_/go/bin')
+    
+    state, data = dataget()
+
+    if len(sys.argv) > 1:
+        counter = 0
+
+        if state == 'search':
+            lpath = len(data)
+            res = subprocess.Popen([join(path, 'csearch'), '-f', data, sys.argv[1]],stdout=subprocess.PIPE)
+            while True:
+                line = res.stdout.readline()
+                if not line:
+                    break
+                counter += 1
+                l = line.decode('utf-8').rstrip()
+                print(l[lpath:])
+            if counter == 0:
+                print("\0message\x1f<i>Not found</i>\n")
+                print(' ')
+            else:
+                print("\0message\x1f<i>(Finded {})</i>\n".format(counter))
+            dataset('select', data)
+
+        if state == 'select':
+            x = sys.argv[1].split(':')
+            if len(x) < 2:
+                return
+            p = data + x[0]
+            popen("subl_text {}".format(p))
+            return
+
+        if state == '':
+            dataset('search', sys.argv[1])
+            print("\0message\x1f<i>(Search in {})</i>\n".format(sys.argv[1]))
+            print("\0no-custom\x1ffalse\n")
+            print("\0nonselectable\x1ftrue\n")
+            print('\0prompt\x1fSearch text\n')
+            print(' ')
+
+        return
+
+    res  = subprocess.check_output([join(path, 'cindex'), '-list'], encoding="utf-8")
+    print(res)
+
+if __name__ == "__main__":
+    main()
