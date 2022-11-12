@@ -1,0 +1,16 @@
+#!/usr/bin/python3
+
+import subprocess
+import sys
+from os import popen
+
+def main():
+    if len(sys.argv) > 1:
+        popen('xdg-open https://google.com/search?q={}'.format(sys.argv[1]))
+        return
+
+    print("\0message\x1f<i>Search on Google</i>\n")
+    print(' ')
+
+if __name__ == "__main__":
+    main()

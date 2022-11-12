@@ -1,0 +1,63 @@
+#!/usr/bin/python3
+
+from os import getenv, popen
+from os.path import join
+import sys
+
+def dataset(state, d = 'nop'):
+    print("\0data\x1f{}_x_x_{}\n".format(state, d))
+
+def dataget():
+    data  = getenv('ROFI_DATA', '')
+    if data == '':
+        return '', ''
+    s = data.split('_x_x_')
+    if len(s) != 2:
+        return '', ''
+    return s[0], s[1]
+
+def main():
+    home    = getenv('HOME')
+    counter = 0
+    state, data = dataget()
+
+    if len(sys.argv) > 1:
+        
+        if state == 'selected':
+            action = sys.argv[1]
+
+            if action == 'status':
+                for line in popen("systemctl status {}".format(data)):
+                    print(line)
+                print("\0message\x1f<i>(Status from {})</i>\n".format(data))
+
+            if action == 'restart':
+                popen('systemctl restart {}'.format(data))
+
+            if action == 'stop':
+                popen('systemctl stop {}'.format(data))
+
+            dataset('end')
+
+        if state == '':
+            service = sys.argv[1].split()
+
+            if service[0].startswith('>'):
+                popen('systemctl start {}'.format(service[0][1:].strip()))
+                return
+
+            print('\n'.join(['status', 'stop', 'restart']))
+            print("\0message\x1f<i>(Select action for {})</i>\n".format(service[0]))
+            dataset('selected', service[0])
+
+        return
+
+    for line in popen("systemctl --type=service --state=running"):
+        counter += 1
+        if counter == 1:
+            continue
+        print(line)
+        
+
+if __name__ == "__main__":
+    main()
