@@ -1,0 +1,72 @@
+#!/usr/bin/python3
+
+from os import getenv, popen, system
+from os.path import join
+import sys
+
+def dataset(state, d = 'nop'):
+    print("\0data\x1f{}_x_x_{}\n".format(state, d))
+
+def dataget():
+    data  = getenv('ROFI_DATA', '')
+    if data == '':
+        return '', ''
+    s = data.split('_x_x_')
+    if len(s) != 2:
+        return '', ''
+    return s[0], s[1]
+
+def main():
+
+    counter = 0
+
+    state, data = dataget()
+
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].strip()
+
+        if state == 'images':
+            sim = arg.split()
+            print("\0message\x1f<i>(Select action for image {})</i>\n".format(sim[0]))
+            print('\n'.join(['run', 'remove']))
+            dataset('select_image', sim[1])
+
+        if state == 'select_image':
+            if arg == 'remove':
+                popen('docker rmi {}'.format(data))
+
+            if arg == 'run':
+                popen('docker run -d {}'.format(data))
+
+        if state == 'containers':
+            sim = arg.split()
+            print("\0message\x1f<i>(Select action for container {})</i>\n".format(sim[0]))
+            print('\n'.join(['pause', 'unpause', 'stop', 'kill', 'restart', 'top']))
+            dataset('select_container', sim[1])
+
+        if state == 'select_container':
+            p = popen('docker container {} {}'.format(arg, data))
+            if arg == 'top':
+                for line in p:
+                    print(line)
+
+        if state == '':
+            if arg == 'images':
+                for line in popen('docker images --format "{{.ID}}___{{.Repository}}:{{.Tag}}___{{.Size}}___{{.CreatedAt}}"'):
+                    l = line.split('___')
+                    print(l[1], l[0], l[2], l[3])
+                dataset('images', arg)
+
+            if arg == 'containers':
+                for line in popen('docker container ls --format "{{.ID}}___{{.Status}}___{{.Image}}___{{.Names}}"'):
+                    l = line.split('___')
+                    print(l[2], l[0], '['+l[1]+']', l[3])
+                dataset('containers', arg)
+        return
+
+
+    print('images')
+    print('containers')
+
+if __name__ == "__main__":
+    main()

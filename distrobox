@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+
+from os import getenv, popen, system
+from os.path import join
+import sys
+
+def dataset(state, d = 'nop'):
+    print("\0data\x1f{}_x_x_{}\n".format(state, d))
+
+def dataget():
+    data  = getenv('ROFI_DATA', '')
+    if data == '':
+        return '', ''
+    s = data.split('_x_x_')
+    if len(s) != 2:
+        return '', ''
+    return s[0], s[1]
+
+def main():
+    counter = 0
+
+    state, data = dataget()
+
+    if len(sys.argv) > 1:
+
+        if state == 'selected':
+            cmd = sys.argv[1].strip()
+
+            if cmd == 'enter':
+                popen('terminal -hold -e distrobox enter {}'.format(data))
+            
+            if cmd == 'stop':
+                popen('distrobox stop {} -Y'.format(data))
+
+            dataset('end')
+
+        if state == '':
+            container = sys.argv[1].split()
+            print("\0message\x1f<i>(Select action for {})</i>\n".format(container[0]))
+            print('\n'.join(['stop', 'enter']))
+            dataset('selected', container[0].strip())
+
+        return
+
+    for line in popen("distrobox list"):
+        counter += 1
+        if counter == 1:
+            continue
+        l = line.split('|')
+        print(l[1], l[2])
+
+if __name__ == "__main__":
+    main()
