@@ -1,0 +1,182 @@
+#!/usr/bin/python3
+
+from os import getenv, popen, listdir
+from os.path import join, exists, isfile, isdir
+import sys, os
+import subprocess
+import hashlib
+
+def dataset(state, d):
+    print('\0data\x1f{}_x_x_{}\n'.format(state, d))
+
+def dataget():
+    data  = getenv('ROFI_DATA', '')
+    if data == '':
+        return '', ''
+    s = data.split('_x_x_')
+    if len(s) != 2:
+        return '', ''
+    return s[0], s[1]
+
+def fm(path):
+    if path != '/':
+        print('..')
+    print('-> (Select {}) <-'.format(path))
+    onlydirs = [f for f in listdir(path) if isdir(join(path, f))]
+    onlydirs.sort()
+    for d in onlydirs:
+        print(d)
+
+
+def addpath(path, npath):
+    with open(path + '/dirs.txt', 'a') as f:
+        f.write(npath+'\n')
+        f.close()
+
+def rmpath(path, rpath):
+    lines = []
+    with open(path + '/dirs.txt', 'r') as rf:
+        lines = rf.readlines()
+        rf.close()
+    with open(path + '/dirs.txt', 'w') as fw:
+        for line in lines:
+            if line.strip("\n") != rpath.strip():
+                fw.write(line)
+            else:
+                rmsearchfile(path, rpath.strip())
+        fw.close()
+
+def dirlist(path):
+    with open(path + '/dirs.txt') as f:
+        for line in f:
+            print(line)
+        f.close()
+
+def sendmsg(msg):
+    print('\0message\x1f<i>{}</i>\n'.format(msg))
+
+def makefile(path):
+    if not isfile(path):
+        with open(path, 'a') as f:
+            f.close()
+
+def init(path):
+    if not exists(path):
+        os.mkdir(path)
+
+    makefile(path + '/dirs.txt')
+
+def rmsearchfile(path, pdir):
+    res = hashlib.md5(pdir.encode())
+    dgs = res.hexdigest()[:16]
+    fls = join(path, dgs)
+    if exists(fls):
+        os.unlink(fls)
+
+def addsearchline(path, pdir, sline):
+    res = hashlib.md5(pdir.encode())
+    dgs = res.hexdigest()[:16]
+    fls = join(path, dgs)
+    makefile(fls)
+    lines = []
+    counter = 0
+    with open(fls, 'r') as rf:
+        lines = rf.readlines()
+        rf.close()
+    for line in lines:
+        counter += 1
+        if line.strip("\n") == sline:
+            return
+    if counter >= 30:
+        lines = lines[:-1]
+    with open(fls, 'w') as fw:
+        out = ''.join(lines)
+        out = sline + '\n' + out
+        fw.write(out)
+        fw.close()
+
+def printsearchline(path, pdir):
+    res = hashlib.md5(pdir.encode())
+    dgs = res.hexdigest()[:16]
+    fls = join(path, dgs)
+    makefile(fls)
+    lines = []
+    counter = 0
+    with open(fls, 'r') as rf:
+        lines = rf.readlines()
+        rf.close()
+        for line in lines:
+            counter += 1
+            print(line.strip('\n'))
+    return counter
+
+def main():
+
+    home = getenv('HOME')
+    cfgp = join(home, '.config/rofi_greper')
+    mdir = home
+
+    state, data = dataget()
+
+    init(cfgp)
+
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].strip()
+
+        if state == '' and arg != 'Add Path...' and arg != 'Remove Path...':
+            sendmsg('(Search in {})'.format(arg))
+            if printsearchline(cfgp, arg) == 0:
+                print(' ')
+            dataset('search', arg)
+
+        if state == 'search':
+            counter = 0
+            lpath = len(data)
+
+            for line in popen('grep -inIEr "{}" {}'.format(arg, data)):
+                print(line[lpath:])
+                counter += 1
+            if counter == 0:
+                sendmsg('(Not Found {})'.format(data))
+                print(' ')
+            else:
+                addsearchline(cfgp, data, arg)
+                sendmsg('(Finded {} in {})'.format(counter, data))
+            dataset('select', data)
+
+        if state == "select":
+            npath = arg.split(':')
+            ppath = data + '/' + npath[0]
+            popen('subl_text {}'.format(ppath))
+
+        if state == 'select_dir' or arg == 'Add Path...':
+            if state == 'select_dir':
+
+                if arg.startswith('-> '):
+                    addpath(cfgp, data)
+                    return
+
+                if arg == '..':
+                    mdir = os.path.dirname(data)
+                else:
+                    mdir = data + '/' + arg
+            fm(mdir)
+            dataset('select_dir', mdir)
+
+        if state == 'remove_dir' or arg == 'Remove Path...':
+            if state == 'remove_dir':
+                rmpath(cfgp, arg)
+                return
+            sendmsg('(Select path for remove)')
+            dirlist(cfgp)
+            dataset('remove_dir', '')
+
+        return
+
+    dirlist(cfgp)
+    print('Add Path...')
+    print('Remove Path...')
+    
+
+if __name__ == '__main__':
+    main()
