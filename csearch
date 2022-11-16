@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 
 from os import getenv, popen
-from os.path import join
+from os.path import join, exists, isfile
 import sys, os
 import subprocess
+import hashlib
 
 def dataset(state, d):
     print("\0data\x1f{}_x_x_{}\n".format(state, d))
@@ -17,12 +18,61 @@ def dataget():
         return '', ''
     return s[0], s[1]
 
+def touchfile(path):
+    if not isfile(path):
+        with open(path, 'a') as f:
+            f.close()
+
+def getlines(path):
+    lines = []
+    with open(path, 'r') as rf:
+        lines = rf.readlines()
+        rf.close()
+    return lines
+
+def printhistory(path, spath):
+    hash  = gethash(spath)
+    hpath = join(path, hash)
+    touchfile(hpath)
+    lines = getlines(hpath)
+    for line in lines:
+        print(line.strip('\n'))
+    return len(lines)
+
+def appendhistory(path, dpath, sline):
+    hash  = gethash(dpath)
+    hpath = join(path, hash)
+    touchfile(hpath)
+    lines  = getlines(hpath)
+    adline = sline.lower()
+    for line in lines:
+        if adline == line.strip('\n').lower():
+            return
+    if len(lines) >= 50:
+        lines = lines[:-1]
+    with open(hpath, 'w') as fw:
+        out = ''.join(lines)
+        out = sline + '\n' + out
+        fw.write(out)
+        fw.close()
+
+def gethash(data):
+    res = hashlib.md5(data.encode())
+    return res.hexdigest()[:16]
+
+def init(path):
+    if not exists(path):
+        os.mkdir(path)
+
 def main():
 
+    home = getenv('HOME')
+    cfgp = join(home, '.config/rofi_csearch')
     path = getenv('PATH_CSEARCH')
 
+    init(cfgp)
+
     if path is None:
-        home = getenv('HOME')
         path = join(home, '_/go/bin')
     
     state, data = dataget()
@@ -44,6 +94,7 @@ def main():
                 print("\0message\x1f<i>Not found</i>\n")
                 print(' ')
             else:
+                appendhistory(cfgp, data, sys.argv[1])
                 print("\0message\x1f<i>(Finded {})</i>\n".format(counter))
             dataset('select', data)
 
@@ -61,7 +112,8 @@ def main():
             print("\0no-custom\x1ffalse\n")
             print("\0nonselectable\x1ftrue\n")
             print('\0prompt\x1fSearch text\n')
-            print(' ')
+            if printhistory(cfgp, sys.argv[1]) == 0:
+                print(' ')
 
         return
 

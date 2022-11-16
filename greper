@@ -6,6 +6,13 @@ import sys, os
 import subprocess
 import hashlib
 
+def getlines(path):
+    lines = []
+    with open(path) as f:
+        lines = f.readlines()
+        f.close()
+    return lines
+
 def dataset(state, d):
     print('\0data\x1f{}_x_x_{}\n'.format(state, d))
 
@@ -27,17 +34,13 @@ def fm(path):
     for d in onlydirs:
         print(d)
 
-
 def addpath(path, npath):
     with open(path + '/dirs.txt', 'a') as f:
         f.write(npath+'\n')
         f.close()
 
 def rmpath(path, rpath):
-    lines = []
-    with open(path + '/dirs.txt', 'r') as rf:
-        lines = rf.readlines()
-        rf.close()
+    lines = getlines(path + '/dirs.txt')
     with open(path + '/dirs.txt', 'w') as fw:
         for line in lines:
             if line.strip("\n") != rpath.strip():
@@ -47,15 +50,13 @@ def rmpath(path, rpath):
         fw.close()
 
 def dirlist(path):
-    with open(path + '/dirs.txt') as f:
-        for line in f:
-            print(line)
-        f.close()
+    for line in getlines(path + '/dirs.txt'):
+        print(line)
 
 def sendmsg(msg):
     print('\0message\x1f<i>{}</i>\n'.format(msg))
 
-def makefile(path):
+def touchfile(path):
     if not isfile(path):
         with open(path, 'a') as f:
             f.close()
@@ -64,30 +65,25 @@ def init(path):
     if not exists(path):
         os.mkdir(path)
 
-    makefile(path + '/dirs.txt')
+    touchfile(path + '/dirs.txt')
+
+def gethash(data):
+    res = hashlib.md5(data.encode())
+    return res.hexdigest()[:16]
 
 def rmsearchfile(path, pdir):
-    res = hashlib.md5(pdir.encode())
-    dgs = res.hexdigest()[:16]
-    fls = join(path, dgs)
+    fls = join(path, gethash(pdir))
     if exists(fls):
         os.unlink(fls)
 
-def addsearchline(path, pdir, sline):
-    res = hashlib.md5(pdir.encode())
-    dgs = res.hexdigest()[:16]
-    fls = join(path, dgs)
-    makefile(fls)
-    lines = []
-    counter = 0
-    with open(fls, 'r') as rf:
-        lines = rf.readlines()
-        rf.close()
+def addhistoryline(path, pdir, sline):
+    fls = join(path, gethash(pdir))
+    touchfile(fls)
+    lines = getlines(fls)
     for line in lines:
-        counter += 1
-        if line.strip("\n") == sline:
+        if line.strip('\n') == sline:
             return
-    if counter >= 30:
+    if len(lines) >= 30:
         lines = lines[:-1]
     with open(fls, 'w') as fw:
         out = ''.join(lines)
@@ -95,20 +91,13 @@ def addsearchline(path, pdir, sline):
         fw.write(out)
         fw.close()
 
-def printsearchline(path, pdir):
-    res = hashlib.md5(pdir.encode())
-    dgs = res.hexdigest()[:16]
-    fls = join(path, dgs)
-    makefile(fls)
-    lines = []
-    counter = 0
-    with open(fls, 'r') as rf:
-        lines = rf.readlines()
-        rf.close()
-        for line in lines:
-            counter += 1
-            print(line.strip('\n'))
-    return counter
+def printhistory(path, pdir):
+    fls = join(path, gethash(pdir))
+    touchfile(fls)
+    lines = getlines(fls)
+    for line in lines:
+        print(line.strip('\n'))
+    return len(lines)
 
 def main():
 
@@ -125,7 +114,7 @@ def main():
 
         if state == '' and arg != 'Add Path...' and arg != 'Remove Path...':
             sendmsg('(Search in {})'.format(arg))
-            if printsearchline(cfgp, arg) == 0:
+            if printhistory(cfgp, arg) == 0:
                 print(' ')
             dataset('search', arg)
 
@@ -140,7 +129,7 @@ def main():
                 sendmsg('(Not Found {})'.format(data))
                 print(' ')
             else:
-                addsearchline(cfgp, data, arg)
+                addhistoryline(cfgp, data, arg)
                 sendmsg('(Finded {} in {})'.format(counter, data))
             dataset('select', data)
 

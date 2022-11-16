@@ -1,16 +1,57 @@
 #!/usr/bin/python3
 
-import subprocess
 import sys
-from os import popen
+from urllib.parse import quote
+from os import popen, getenv
+from os.path import join, isfile
+
+def touchfile(path):
+    if not isfile(path):
+        with open(path, 'a') as f:
+            f.close()
+
+def getlines(path):
+    lines = []
+    with open(path, 'r') as rf:
+        lines = rf.readlines()
+        rf.close()
+    return lines
+
+def printhistory(path):
+    lines = getlines(path)
+    for line in lines:
+        print(line.strip('\n'))
+    return len(lines)
+
+def appendhistory(path, sline):
+    lines  = getlines(path)
+    adline = sline.lower()
+    for line in lines:
+        if adline == line.strip('\n').lower():
+            return
+    if len(lines) >= 50:
+        lines = lines[:-1]
+    with open(path, 'w') as fw:
+        out = ''.join(lines)
+        out = sline + '\n' + out
+        fw.write(out)
+        fw.close()
 
 def main():
+    home = getenv('HOME')
+    cfgp = join(home, '.config/rofi_google')
+    touchfile(cfgp)
+
     if len(sys.argv) > 1:
-        popen('xdg-open https://google.com/search?q={}'.format(sys.argv[1]))
+        arg = sys.argv[1].strip()
+        if len(arg) > 0:
+            appendhistory(cfgp, arg)
+            popen('xdg-open https://google.com/search?q={}'.format(quote(arg)))
         return
 
-    print("\0message\x1f<i>Search on Google</i>\n")
-    print(' ')
+    print("\0message\x1f<i>Search in Google</i>\n")
+    if printhistory(cfgp) == 0:
+        print(' ')
 
 if __name__ == "__main__":
     main()
