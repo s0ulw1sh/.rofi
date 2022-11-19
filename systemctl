@@ -37,6 +37,14 @@ def main():
             if action == 'stop':
                 popen('systemctl stop {}'.format(data))
 
+            if action == 'dependencies':
+                for line in popen('systemctl list-dependencies {}'.format(data)):
+                    print(line)
+
+            if action == 'show':
+                for line in popen('systemctl show {}'.format(data)):
+                    print(line)
+
             dataset('end')
 
         if state == '':
@@ -46,7 +54,7 @@ def main():
                 popen('systemctl start {}'.format(service[0][1:].strip()))
                 return
 
-            print('\n'.join(['status', 'stop', 'restart']))
+            print('\n'.join(['show', 'status', 'stop', 'restart', 'dependencies']))
             print("\0message\x1f<i>(Select action for {})</i>\n".format(service[0]))
             dataset('selected', service[0])
 
