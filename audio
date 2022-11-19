@@ -1,0 +1,77 @@
+#!/usr/bin/python3
+
+from os import getenv, popen
+from os.path import join, exists, isfile
+import sys, os
+import subprocess
+import hashlib
+import re
+
+def dataset(state, d):
+    print("\0data\x1f{}_x_x_{}\n".format(state, d))
+
+def dataget():
+    data  = getenv('ROFI_DATA', '')
+    if data == '':
+        return '', ''
+    s = data.split('_x_x_')
+    if len(s) != 2:
+        return '', ''
+    return s[0], s[1]
+
+def getcurrent():
+    counter = 0
+    default = ''
+    for line in popen('pactl get-default-sink'):
+        default = line.strip().lower()
+    for line in popen('pactl list short sinks'):
+        if default in line.lower():
+            return counter
+        counter += 1
+    return -1
+
+def getoutputlist():
+    counter = 0
+    current = getcurrent()
+    for line in popen('pactl list sinks'):
+        if line.count('device.description') == 1:
+            ns = re.search('"(.+?)"', line)
+            if current == counter:
+                print('[X]', counter, ns.group(1))
+            else:
+                print('[ ]', counter, ns.group(1))
+            counter += 1
+
+def setoutput(selected):
+    counter = 0
+    current = getcurrent()
+    if current == selected:
+        return
+    popen('pactl set-default-sink {}'.format(selected))
+
+def main():
+
+    state, data = dataget()
+
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].strip().lower()
+
+        if state == '' and arg == 'output':
+            getoutputlist()
+            dataset('select_output', arg)
+
+        if state == '' and arg == 'input':
+            print('TODO')
+            dataset('end', arg)
+
+        if state == 'select_output':
+            i = arg[4:].split()
+            setoutput(int(i[0]))
+            dataset('end', arg)
+
+        return
+
+    print('\n'.join(['Output', 'Input']))
+
+if __name__ == "__main__":
+    main()
